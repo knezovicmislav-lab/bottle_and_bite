@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Snap a wine or beer label to find food that goes with it, or snap your food to find the right drink.">
+<meta name="theme-color" content="#7A1F35">
+<title>Bottle &amp; Bite</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%237A1F35' d='M10 2h4v4.5c0 .8.4 1.5 1 2 1.3 1 2 2.4 2 4V20a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-7.5c0-1.6.7-3 2-4 .6-.5 1-1.2 1-2V2z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow phone-first column — scan panel on top, result "tasting card" below, history last. */
+:root{
+  --bg:#F2F3EF;        /* bottle-glass paper */
+  --surface:#FFFFFF;
+  --line:#D9DDD5;
+  --fg:#1C221F;
+  --muted:#5E6862;
+  --claret:#7A1F35;    /* wine accent */
+  --claret-soft:#F3E4E8;
+  --hop:#9A6B00;       /* beer accent */
+  --hop-soft:#F6ECD2;
+  --warn:#9A3A12;
+  --font-display:"Gloock", Georgia, "Times New Roman", serif;
+  --font-body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111513; --surface:#1A201D; --line:#2C3531; --fg:#E8ECE7; --muted:#9AA59F;
+    --claret:#E08A9E; --claret-soft:#3A1E26; --hop:#E3B54E; --hop-soft:#352B14; --warn:#F09A72;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111513; --surface:#1A201D; --line:#2C3531; --fg:#E8ECE7; --muted:#9AA59F;
+  --claret:#E08A9E; --claret-soft:#3A1E26; --hop:#E3B54E; --hop-soft:#352B14; --warn:#F09A72;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.5}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:20px 40px;display:flex;flex-direction:column;gap:22px}
+header{display:flex;flex-direction:column;gap:4px}
+.brand{font-family:var(--font-display);font-size:2.3rem;line-height:1;margin:0;letter-spacing:-.01em}
+.brand .amp{color:var(--claret)}
+.tag{color:var(--muted);margin:0}
+
+.scan{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.drop{position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;
+  min-height:180px;border:1.5px dashed var(--line);border-radius:14px;cursor:pointer;text-align:center;padding:16px;overflow:hidden}
+.drop:hover,.drop:focus-within{border-color:var(--claret)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.drop img{max-width:100%;max-height:260px;border-radius:10px;object-fit:contain}
+.drop .big{font-weight:600;font-size:1.05rem}
+.drop .small{color:var(--muted);font-size:.9rem}
+.bottle-ico{width:34px;height:34px;color:var(--claret)}
+.lbl{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.field{display:flex;flex-direction:column;gap:6px}
+input[type=text]{font:inherit;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);width:100%}
+input[type=text]:focus{outline:2px solid var(--claret);outline-offset:1px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-size:.9rem;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chip:focus-visible,.btn:focus-visible{outline:2px solid var(--claret);outline-offset:2px}
+.actions{display:flex;gap:10px}
+.btn{font:inherit;font-weight:600;border:0;border-radius:12px;padding:13px 16px;cursor:pointer}
+.btn.primary{flex:1;background:var(--claret);color:var(--bg)}
+.btn.primary:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--fg)}
+.status{font-size:.95rem;color:var(--muted);display:flex;align-items:center;gap:8px;margin:0}
+.status.err{color:var(--warn)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--claret);animation:pulse 1s infinite ease-in-out}
+@keyframes pulse{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.dot{animation:none}}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.card-head{padding:18px 16px 14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.card-head.wine{background:var(--claret-soft)}
+.card-head.beer{background:var(--hop-soft)}
+.eyebrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;font-weight:700;color:var(--muted)}
+.pill{padding:2px 8px;border-radius:999px;border:1px solid currentColor}
+.pill.example{color:var(--warn)}
+.kind-wine{color:var(--claret)} .kind-beer{color:var(--hop)}
+.name{font-family:var(--font-display);font-size:1.75rem;line-height:1.1;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:0}
+.specs{display:flex;flex-wrap:wrap;gap:6px 16px;font-family:var(--font-data);font-size:.82rem;font-variant-numeric:tabular-nums}
+.specs span b{font-weight:500;color:var(--muted);margin-right:4px}
+.notes{display:flex;flex-wrap:wrap;gap:6px}
+.note{font-size:.82rem;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line)}
+.card-body{padding:16px;display:flex;flex-direction:column;gap:18px}
+.serve{font-size:.92rem;color:var(--muted);margin:0}
+.serve b{color:var(--fg);font-weight:600}
+.group h3{font-family:var(--font-display);font-weight:400;font-size:1.25rem;margin:0 0 8px}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.plist li{padding:10px 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+.plist li:first-child{border-top:0;padding-top:0}
+.food{font-weight:600}
+.why{color:var(--muted);font-size:.93rem}
+.avoid{background:var(--bg);border-radius:12px;padding:12px;font-size:.92rem}
+.avoid b{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--warn);margin-bottom:4px}
+.lowconf{font-size:.9rem;color:var(--warn);margin:0}
+
+.hist h2{font-family:var(--font-display);font-weight:400;font-size:1.3rem;margin:0 0 8px}
+.hlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.hlist button{width:100%;text-align:left;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.hlist button:hover{border-color:var(--claret)}
+.hlist .hn{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hlist .hd{font-family:var(--font-data);font-size:.75rem;color:var(--muted);flex-shrink:0}
+.empty{color:var(--muted);font-size:.92rem;margin:0}
+footer{color:var(--muted);font-size:.8rem;text-align:center}
+
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;background:var(--bg);border:1px solid var(--line);border-radius:14px}
+.seg button{font:inherit;font-weight:600;font-size:.95rem;border:0;border-radius:10px;padding:10px 8px;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.seg button:focus-visible{outline:2px solid var(--claret);outline-offset:1px}
+.seg svg{width:18px;height:18px;flex-shrink:0}
+.card-head.food{background:var(--bg)}
+.kind-food{color:var(--fg)}
+.row-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.row-top .food{min-width:0}
+.price{font-family:var(--font-data);font-size:.8rem;font-variant-numeric:tabular-nums;white-space:nowrap;flex-shrink:0;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.tier{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--muted)}
+.bottle-price{display:inline-flex;align-items:baseline;gap:6px;font-family:var(--font-data);font-size:.9rem;font-variant-numeric:tabular-nums;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 10px;align-self:flex-start}
+.bottle-price b{font-family:var(--font-body);font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.fineprint{font-size:.8rem;color:var(--muted);margin:0}
+.country-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.country-row select{font:inherit;flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.country-row select:focus{outline:2px solid var(--claret);outline-offset:1px}
+.cur{font-family:var(--font-data);font-size:.82rem;color:var(--muted);white-space:nowrap}
+.hist{display:flex;flex-direction:column;gap:10px}
+.hist h2{margin:0}
+.hist-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.count{font-family:var(--font-data);font-size:.8rem;color:var(--muted)}
+.memgrid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.memgrid button{width:100%;font:inherit;color:var(--fg);text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:0;overflow:hidden;cursor:pointer;display:flex;flex-direction:column}
+.memgrid button:hover,.memgrid button:focus-visible{border-color:var(--claret);outline:none}
+.memgrid button[aria-current="true"]{border-color:var(--claret);box-shadow:0 0 0 1px var(--claret)}
+.thumb{position:relative;aspect-ratio:1/1;max-width:100%;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb svg{width:36px;height:36px}
+.thumb .selfie-dot{position:absolute;right:8px;bottom:8px;width:38px;height:38px;border-radius:50%;border:2px solid var(--surface);object-fit:cover;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.mem-meta{padding:8px 10px 10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.mem-meta .hn{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-meta .hd{font-size:.75rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.membar{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.membar h3{font-family:var(--font-display);font-weight:400;font-size:1.15rem;margin:0}
+.photos{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ph{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ph .frame{position:relative;aspect-ratio:1/1;max-width:100%;border-radius:12px;overflow:hidden;background:var(--bg);border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:var(--muted);text-align:center;padding:8px;font-size:.85rem}
+.ph .frame.has{border-style:solid;padding:0}
+.ph .frame img{width:100%;height:100%;object-fit:cover}
+.ph .frame input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.ph .frame:focus-within{outline:2px solid var(--claret);outline-offset:2px}
+.ph .cap{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--muted)}
+.ph svg{width:26px;height:26px}
+.linkbtn{font:inherit;font-size:.85rem;background:none;border:0;padding:0;color:var(--claret);cursor:pointer;text-align:left;text-decoration:underline;text-underline-offset:2px}
+.mem-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.btn.small{padding:8px 12px;font-size:.88rem;border-radius:10px}
+.btn.danger{background:transparent;border:1px solid var(--line);color:var(--warn)}
+.btn.danger.armed{background:var(--warn);color:var(--surface);border-color:var(--warn)}
+.hlist .hk{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-right:6px}
+
+/* page basics (were provided by the Claude viewer) */
+html{-webkit-text-size-adjust:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+body.locked{overflow:hidden}
+footer a{color:inherit}
+
+/* age gate */
+.gate{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.gate-box{max-width:380px;width:100%;display:flex;flex-direction:column;gap:14px;text-align:center}
+.gate-box .brand{font-size:2.6rem}
+.gate-box p{margin:0;color:var(--muted)}
+.gate-box .q{font-size:1.15rem;color:var(--fg);font-weight:600}
+.gate-actions{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="gate" id="ageGate" hidden role="dialog" aria-modal="true" aria-labelledby="ageQ">
+  <div class="gate-box">
+    <div class="brand">Bottle <span class="amp">&amp;</span> Bite</div>
+    <div id="ageAsk" style="display:contents">
+      <p class="q" id="ageQ">Are you <span id="ageNum">18</span> or older?</p>
+      <p>This app is about alcoholic drinks, so you need to be of legal drinking age (<span id="ageNum2">18</span>+) where you live.</p>
+      <div class="gate-actions">
+        <button class="btn primary" id="ageYes">Yes, I am</button>
+        <button class="btn ghost" id="ageNo">No</button>
+      </div>
+    </div>
+    <p id="ageSorry" hidden>Sorry, Bottle &amp; Bite is only for adults of legal drinking age. Come back when you're older.</p>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <h1 class="brand">Bottle <span class="amp">&amp;</span> Bite</h1>
+    <p class="tag" id="tagline">Snap a drink. Find what to eat.</p>
+  </header>
+
+  <section class="scan" aria-label="Scan">
+    <div class="seg" role="group" aria-label="What are you scanning?" id="mode">
+      <button data-m="bottle" aria-pressed="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 2h4v4.5c0 .8.4 1.5 1 2 1.3 1 2 2.4 2 4V20a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-7.5c0-1.6.7-3 2-4 .6-.5 1-1.2 1-2V2z"/></svg>
+        Bottle → food
+      </button>
+      <button data-m="food" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="13" r="7"/><circle cx="12" cy="13" r="3.5"/><path d="M3 3v6M5 3v6M3 6h2M4 9v12M21 3c-1.5 1-2 3-2 5s.5 3 2 3v10"/></svg>
+        Food → drink
+      </button>
+    </div>
+
+    <div class="drop" id="drop">
+      <input type="file" id="photo" accept="image/*" capture="environment" aria-label="Take or choose a photo">
+      <div id="dropEmpty" style="display:contents">
+        <svg class="bottle-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>
+        <span class="big" id="dropBig">Take a photo of the label</span>
+        <span class="small">or pick one from your gallery</span>
+      </div>
+      <img id="preview" alt="Your photo" hidden>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="typed" id="typedLbl">Or type the name</label>
+      <input type="text" id="typed" placeholder="e.g. Pošip, Guinness, Chianti Classico" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <span class="lbl" id="occLbl">Occasion</span>
+      <div class="chips" role="group" aria-labelledby="occLbl" id="occ">
+        <button class="chip" data-v="any" aria-pressed="true">Anything</button>
+        <button class="chip" data-v="quick snacks" aria-pressed="false">Snacks only</button>
+        <button class="chip" data-v="dinner at home" aria-pressed="false">Dinner</button>
+        <button class="chip" data-v="date night" aria-pressed="false">Date night</button>
+        <button class="chip" data-v="barbecue" aria-pressed="false">BBQ</button>
+        <button class="chip" data-v="movie night" aria-pressed="false">Movie night</button>
+        <button class="chip" data-v="on a tight budget, cheap supermarket options only" aria-pressed="false">On a budget</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="country">Shopping in</label>
+      <div class="country-row">
+        <select id="country"></select>
+        <span class="cur" id="cur" aria-live="polite"></span>
+      </div>
+      <p class="fineprint" id="countryNote">Set from your phone's time zone. Change it if it's wrong.</p>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="go">Find pairings</button>
+      <button class="btn ghost" id="stop" hidden>Stop</button>
+    </div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section id="result" aria-live="polite"></section>
+  <section id="memBar" class="membar" hidden aria-label="This memory"></section>
+
+  <section class="hist" aria-label="Memories">
+    <div class="hist-head">
+      <h2>Memories</h2>
+      <span class="count" id="memCount"></span>
+    </div>
+    <p class="fineprint">Every scan is saved here with its photo. Add a selfie to remember who you were with. Photos stay on this phone only; nobody else who opens the app can see them.</p>
+    <ul class="memgrid" id="hist"></ul>
+    <p class="empty" id="histEmpty">Your first scan will appear here as a memory.</p>
+  </section>
+
+  <footer>Suggestions and prices are AI estimates, not live shop prices. Please drink responsibly and follow your country's legal drinking age. · <a href="/privacy.html">Privacy</a></footer>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const photo=$("photo"), preview=$("preview"), dropEmpty=$("dropEmpty"), typed=$("typed"),
+        go=$("go"), stop=$("stop"), status=$("status"), result=$("result"), hist=$("hist"), histEmpty=$("histEmpty");
+  let mode="bottle", file=null, occasion="any", ctl=null;
+
+  const EXAMPLES = {
+    bottle:{
+      mode:"bottle",
+      drink:{name:"Plavac Mali",producer:"Example winery",kind:"wine",style:"Dry red",region:"Pelješac, Croatia",vintage:"2021",abv:"14%",notes:["dried cherry","fig","black pepper","firm tannins"],confidence:"high",price:"€10–18"},
+      serve:"16–18 °C in a large red-wine glass; open 30 minutes early.",
+      pairings:[
+        {food:"Pršut and aged Paški sir",category:"snack",why:"Salt and fat soften the tannins; the cheese's nuttiness matches the dried fruit.",price:"€8–12"},
+        {food:"Roasted almonds with rosemary",category:"snack",why:"Toasty, savory crunch picks up the wine's earthy side.",price:"€3–5"},
+        {food:"Dried figs with walnuts",category:"snack",why:"Echoes the ripe fig notes without being too sweet.",price:"€4–6"},
+        {food:"Peka (lamb or veal under the bell)",category:"meal",why:"Slow-cooked meat and rich juices stand up to a big, warm red.",price:"€25–35"},
+        {food:"Pašticada with gnocchi",category:"meal",why:"The sweet-sour braise mirrors the wine's dried-fruit character.",price:"€15–22"},
+        {food:"Grilled ćevapi with ajvar",category:"meal",why:"Char and smoky pepper love the wine's spice.",price:"€8–12"}
+      ],
+      avoid:["Delicate white fish","Very spicy chili dishes (alcohol amplifies heat)"]
+    },
+    food:{
+      mode:"food",
+      dish:{name:"Black risotto",description:"Squid-ink risotto with cuttlefish, garlic and olive oil",cuisine:"Dalmatian",flavors:["briny","garlicky","rich","umami"],confidence:"high"},
+      drinks:[
+        {name:"Pošip",kind:"wine",style:"Dry white, Korčula",why:"Full enough for the richness, with salty freshness that loves seafood.",price:"€9–15",tier:"mid"},
+        {name:"Malvazija Istarska",kind:"wine",style:"Dry white, Istria",why:"Crisp and a little herbal; cuts through the ink and olive oil.",price:"€6–10",tier:"budget"},
+        {name:"Grk",kind:"wine",style:"Rare dry white, Lumbarda",why:"Mineral and savory, a local classic with squid dishes.",price:"€18–28",tier:"splurge"},
+        {name:"Pilsner",kind:"beer",style:"Crisp lager",why:"Clean bitterness resets the palate between rich bites.",price:"€1.5–3",tier:"budget"},
+        {name:"Belgian witbier",kind:"beer",style:"Wheat beer with coriander and orange",why:"Citrus and spice lift the briny flavors.",price:"€2.5–4",tier:"mid"}
+      ],
+      avoid:["Big oaky reds (tannin turns metallic with squid ink)"]
+    }
+  };
+
+  // ---- Country & currency (from the phone's time zone / language, no location permission) ----
+  // [code, currency, typical wine-bottle example low, high]
+  const COUNTRIES = [
+    ["HR","EUR",8,12],["DE","EUR",7,12],["FR","EUR",8,14],["IT","EUR",7,12],["ES","EUR",6,10],["AT","EUR",8,14],
+    ["NL","EUR",7,12],["BE","EUR",8,13],["IE","EUR",12,18],["PT","EUR",5,9],["GR","EUR",8,12],["SI","EUR",7,12],
+    ["SK","EUR",6,10],["FI","EUR",12,18],["EE","EUR",9,14],["LV","EUR",9,14],["LT","EUR",9,14],["LU","EUR",8,14],
+    ["MT","EUR",8,12],["CY","EUR",8,12],["ME","EUR",7,12],
+    ["GB","GBP",8,12],["CH","CHF",12,20],["SE","SEK",100,150],["NO","NOK",150,220],["DK","DKK",70,110],["IS","ISK",3000,4500],
+    ["PL","PLN",30,50],["CZ","CZK",200,350],["HU","HUF",3000,5000],["RO","RON",35,60],["BG","BGN",15,25],
+    ["RS","RSD",900,1500],["BA","BAM",12,20],["MK","MKD",400,700],["AL","ALL",900,1500],["TR","TRY",400,700],["UA","UAH",250,450],
+    ["US","USD",12,20],["CA","CAD",15,25],["MX","MXN",200,350],["BR","BRL",50,90],["AR","ARS",8000,15000],["CL","CLP",6000,10000],
+    ["AU","AUD",18,28],["NZ","NZD",18,28],["JP","JPY",1500,2500],["KR","KRW",20000,35000],["CN","CNY",80,150],
+    ["HK","HKD",120,200],["TW","TWD",400,700],["SG","SGD",30,45],["TH","THB",500,900],["PH","PHP",500,900],
+    ["IN","INR",1000,1800],["AE","AED",70,120],["IL","ILS",50,90],["ZA","ZAR",100,180]
+  ];
+  const TZ = {
+    "Europe/Zagreb":"HR","Europe/Berlin":"DE","Europe/Paris":"FR","Europe/Rome":"IT","Europe/Madrid":"ES","Atlantic/Canary":"ES",
+    "Europe/Vienna":"AT","Europe/Amsterdam":"NL","Europe/Brussels":"BE","Europe/Dublin":"IE","Europe/Lisbon":"PT","Atlantic/Madeira":"PT",
+    "Europe/Athens":"GR","Europe/Ljubljana":"SI","Europe/Bratislava":"SK","Europe/Helsinki":"FI","Europe/Tallinn":"EE","Europe/Riga":"LV",
+    "Europe/Vilnius":"LT","Europe/Luxembourg":"LU","Europe/Malta":"MT","Asia/Nicosia":"CY","Europe/Nicosia":"CY","Europe/Podgorica":"ME",
+    "Europe/London":"GB","Europe/Zurich":"CH","Europe/Stockholm":"SE","Europe/Oslo":"NO","Europe/Copenhagen":"DK","Atlantic/Reykjavik":"IS",
+    "Europe/Warsaw":"PL","Europe/Prague":"CZ","Europe/Budapest":"HU","Europe/Bucharest":"RO","Europe/Sofia":"BG","Europe/Belgrade":"RS",
+    "Europe/Sarajevo":"BA","Europe/Skopje":"MK","Europe/Tirane":"AL","Europe/Istanbul":"TR","Europe/Kiev":"UA","Europe/Kyiv":"UA",
+    "America/Toronto":"CA","America/Vancouver":"CA","America/Edmonton":"CA","America/Winnipeg":"CA","America/Halifax":"CA",
+    "America/St_Johns":"CA","America/Regina":"CA","America/Montreal":"CA",
+    "America/Mexico_City":"MX","America/Cancun":"MX","America/Monterrey":"MX","America/Tijuana":"MX","America/Merida":"MX","America/Chihuahua":"MX",
+    "America/Sao_Paulo":"BR","America/Fortaleza":"BR","America/Recife":"BR","America/Manaus":"BR","America/Bahia":"BR","America/Belem":"BR",
+    "America/Santiago":"CL","Pacific/Auckland":"NZ",
+    "Asia/Tokyo":"JP","Asia/Seoul":"KR","Asia/Shanghai":"CN","Asia/Hong_Kong":"HK","Asia/Taipei":"TW","Asia/Singapore":"SG",
+    "Asia/Bangkok":"TH","Asia/Manila":"PH","Asia/Kolkata":"IN","Asia/Calcutta":"IN","Asia/Dubai":"AE","Asia/Jerusalem":"IL",
+    "Asia/Tel_Aviv":"IL","Africa/Johannesburg":"ZA"
+  };
+  const byCode = Object.fromEntries(COUNTRIES.map(([code,cur,lo,hi])=>[code,{code,cur,ex:[lo,hi]}]));
+  let regionNames = null; try{ regionNames = new Intl.DisplayNames(["en"],{type:"region"}); }catch{}
+  const countryName = code => { try{ return regionNames ? regionNames.of(code) : code; }catch{ return code; } };
+  COUNTRIES.forEach(([code])=>{ byCode[code].name = countryName(code); });
+
+  function detectCountry(){
+    let tz=""; try{ tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; }catch{}
+    if(TZ[tz]) return TZ[tz];
+    if(tz.startsWith("Australia/")) return "AU";
+    if(tz.startsWith("America/Argentina/")) return "AR";
+    const langs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language||""]);
+    for(const l of langs){ const m = /[-_]([A-Za-z]{2})\b/.exec(l); if(m && byCode[m[1].toUpperCase()]) return m[1].toUpperCase(); }
+    if(tz.startsWith("America/") || tz.startsWith("US/")) return "US";
+    return "US";
+  }
+  function fmtMoney(cur, n){
+    try{ return new Intl.NumberFormat("en",{style:"currency",currency:cur,maximumFractionDigits:0}).format(n); }catch{ return n+" "+cur; }
+  }
+  const fmtRange = (cur, lo, hi) => `${fmtMoney(cur,lo)}–${fmtMoney(cur,hi)}`;
+
+  const CKEY = "bb.country";
+  const detected = detectCountry();
+  let countryCode = detected;
+  try{ const saved = localStorage.getItem(CKEY); if(saved && byCode[saved]) countryCode = saved; }catch{}
+  const currentCountry = () => byCode[countryCode] || byCode.US;
+
+  function initCountryPicker(){
+    const sel = $("country");
+    const sorted = COUNTRIES.map(c=>byCode[c[0]]).sort((a,b)=>a.name.localeCompare(b.name));
+    sel.innerHTML = sorted.map(c=>`<option value="${c.code}">${esc(c.name)}</option>`).join("");
+    sel.value = countryCode;
+    const paint = () => {
+      const c = currentCountry();
+      $("cur").textContent = `Prices in ${c.cur}`;
+      $("countryNote").textContent = countryCode===detected
+        ? "Set automatically from your phone's settings. Change it if it's wrong."
+        : "You picked this country. It's remembered on this device.";
+    };
+    sel.addEventListener("change", ()=>{
+      countryCode = sel.value;
+      try{ if(countryCode===detected) localStorage.removeItem(CKEY); else localStorage.setItem(CKEY, countryCode); }catch{}
+      paint();
+    });
+    paint();
+  }
+
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const priceTag = p => p ? `<span class="price">${esc(p)}</span>` : "";
+
+  function renderBottle(data, example){
+    const d = data.drink || {};
+    if (data.not_a_drink){
+      result.innerHTML = `<div class="card"><div class="card-body"><p class="lowconf">That doesn't look like a wine or beer label. Try a closer photo of the front label, or type the name.</p></div></div>`;
+      return;
+    }
+    const kind = /beer|ale|lager|stout|ipa|pils|porter|weiss|wit/i.test((d.kind||"")+" "+(d.style||"")) ? "beer" : "wine";
+    const specs = [["Style",d.style],["Region",d.region],["Year",d.vintage],["ABV",d.abv]].filter(x=>x[1]);
+    const snacks = (data.pairings||[]).filter(p=>p.category==="snack");
+    const meals = (data.pairings||[]).filter(p=>p.category!=="snack");
+    const list = arr => arr.map(p=>`<li><div class="row-top"><span class="food">${esc(p.food)}</span>${priceTag(p.price)}</div><span class="why">${esc(p.why)}</span></li>`).join("");
+    result.innerHTML = `
+      <article class="card">
+        <div class="card-head ${kind}">
+          <div class="eyebrow">
+            <span class="kind-${kind}">${kind==="beer"?"Beer":"Wine"}</span>
+            ${example?'<span class="pill example">Example</span>':""}
+          </div>
+          <h2 class="name">${esc(d.name||"Unknown bottle")}</h2>
+          ${d.producer?`<p class="sub">${esc(d.producer)}</p>`:""}
+          ${specs.length?`<div class="specs">${specs.map(([k,v])=>`<span><b>${k}</b>${esc(v)}</span>`).join("")}</div>`:""}
+          ${d.price?`<span class="bottle-price"><b>In shops</b>${esc(d.price)}</span>`:""}
+          ${(d.notes||[]).length?`<div class="notes">${d.notes.map(n=>`<span class="note">${esc(n)}</span>`).join("")}</div>`:""}
+        </div>
+        <div class="card-body">
+          ${d.confidence==="low"?`<p class="lowconf">The label was hard to read, so this is a best guess. Type the name for a sharper answer.</p>`:""}
+          ${data.serve?`<p class="serve"><b>Serve:</b> ${esc(data.serve)}</p>`:""}
+          ${snacks.length?`<div class="group"><h3>Snacks</h3><ul class="plist">${list(snacks)}</ul></div>`:""}
+          ${meals.length?`<div class="group"><h3>Meals</h3><ul class="plist">${list(meals)}</ul></div>`:""}
+          ${(data.avoid||[]).length?`<div class="avoid"><b>Skip with this one</b>${data.avoid.map(esc).join(" · ")}</div>`:""}
+          <p class="fineprint">Food prices are rough shop costs for two people.</p>
+        </div>
+      </article>`;
+  }
+
+  function renderFood(data, example){
+    const d = data.dish || {};
+    if (data.not_food){
+      result.innerHTML = `<div class="card"><div class="card-body"><p class="lowconf">That doesn't look like food. Try a photo of the plate from above, or type the dish name.</p></div></div>`;
+      return;
+    }
+    const order = {budget:0, mid:1, splurge:2};
+    const drinks = (data.drinks||[]).slice().sort((a,b)=>(order[a.tier]??1)-(order[b.tier]??1));
+    const wines = drinks.filter(x=>x.kind!=="beer"), beers = drinks.filter(x=>x.kind==="beer");
+    const tierName = {budget:"Budget", mid:"Mid-range", splurge:"Splurge"};
+    const list = arr => arr.map(x=>`<li>
+        <div class="row-top"><span class="food">${esc(x.name)}</span>${priceTag(x.price)}</div>
+        ${x.style||x.tier?`<span class="tier">${esc([tierName[x.tier],x.style].filter(Boolean).join(" · "))}</span>`:""}
+        <span class="why">${esc(x.why)}</span></li>`).join("");
+    const specs = [["Cuisine",d.cuisine]].filter(x=>x[1]);
+    result.innerHTML = `
+      <article class="card">
+        <div class="card-head food">
+          <div class="eyebrow">
+            <span class="kind-food">Dish</span>
+            ${example?'<span class="pill example">Example</span>':""}
+          </div>
+          <h2 class="name">${esc(d.name||"Unknown dish")}</h2>
+          ${d.description?`<p class="sub">${esc(d.description)}</p>`:""}
+          ${specs.length?`<div class="specs">${specs.map(([k,v])=>`<span><b>${k}</b>${esc(v)}</span>`).join("")}</div>`:""}
+          ${(d.flavors||[]).length?`<div class="notes">${d.flavors.map(n=>`<span class="note">${esc(n)}</span>`).join("")}</div>`:""}
+        </div>
+        <div class="card-body">
+          ${d.confidence==="low"?`<p class="lowconf">Hard to tell what this dish is, so this is a best guess. Type the dish name for a sharper answer.</p>`:""}
+          ${wines.length?`<div class="group"><h3>Wine</h3><ul class="plist">${list(wines)}</ul></div>`:""}
+          ${beers.length?`<div class="group"><h3>Beer</h3><ul class="plist">${list(beers)}</ul></div>`:""}
+          ${(data.avoid||[]).length?`<div class="avoid"><b>Skip with this dish</b>${data.avoid.map(esc).join(" · ")}</div>`:""}
+          <p class="fineprint">Prices are rough shop prices per bottle (wine 0.75 l, beer 0.5 l).</p>
+        </div>
+      </article>`;
+  }
+
+  // ---- Memories: text in localStorage, photos in IndexedDB (both on this device only) ----
+  const memBar = $("memBar");
+  let urls = [];            // object URLs to revoke on redraw
+  let currentMem = null;    // id of the memory shown in the result card
+  const freeUrls = () => { urls.forEach(u=>URL.revokeObjectURL(u)); urls = []; };
+  const blobUrl = b => { const u = URL.createObjectURL(b); urls.push(u); return u; };
+
+  const KEY="pourpair.history.v1";
+  const newId = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  function loadHist(){
+    let h; try{ h = JSON.parse(localStorage.getItem(KEY)||"[]"); }catch{ h = []; }
+    if(!Array.isArray(h)) h = [];
+    let changed = false;
+    h.forEach(e=>{ if(!e.id){ e.id = newId(); changed = true; } });
+    if(changed) saveHist(h);
+    return h;
+  }
+  function saveHist(h){ try{ localStorage.setItem(KEY, JSON.stringify(h.slice(0,60))); return true; }catch{ return false; } }
+
+  // Tiny IndexedDB wrapper
+  let dbP = null;
+  function idb(){
+    if(!dbP) dbP = new Promise((res)=>{
+      try{
+        const r = indexedDB.open("bottle-and-bite", 1);
+        r.onupgradeneeded = () => r.result.createObjectStore("photos");
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => res(null);
+        r.onblocked = () => res(null);
+      }catch{ res(null); }
+    });
+    return dbP;
+  }
+  async function tx(modeRW, fn){
+    const db = await idb(); if(!db) return null;
+    return new Promise((res)=>{
+      try{
+        const t = db.transaction("photos", modeRW); const st = t.objectStore("photos");
+        const req = fn(st);
+        t.oncomplete = () => res(req && "result" in req ? req.result : true);
+        t.onerror = t.onabort = () => res(null);
+      }catch{ res(null); }
+    });
+  }
+  const putPhoto = (key, blob) => tx("readwrite", st=>st.put(blob, key));
+  const getPhoto = key => tx("readonly", st=>st.get(key));
+  const delPhoto = key => tx("readwrite", st=>st.delete(key));
+
+  // Shrink photos so hundreds fit on the phone
+  function shrink(fileOrBlob, max=1024, q=0.82){
+    return new Promise((res)=>{
+      const u = URL.createObjectURL(fileOrBlob), img = new Image();
+      img.onload = () => {
+        const s = Math.min(1, max/Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth*s); c.height = Math.round(img.naturalHeight*s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(u);
+        c.toBlob(b=>res(b||fileOrBlob), "image/jpeg", q);
+      };
+      img.onerror = () => { URL.revokeObjectURL(u); res(fileOrBlob); };
+      img.src = u;
+    });
+  }
+
+  const ICON_BOTTLE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M10 2h4v4.5c0 .8.4 1.5 1 2 1.3 1 2 2.4 2 4V20a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-7.5c0-1.6.7-3 2-4 .6-.5 1-1.2 1-2V2z"/></svg>`;
+  const ICON_PLATE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="13" r="7"/><circle cx="12" cy="13" r="3.5"/></svg>`;
+  const ICON_FACE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="9" cy="10" r=".8" fill="currentColor"/><circle cx="15" cy="10" r=".8" fill="currentColor"/><path d="M8.5 14.5c1.8 2 5.2 2 7 0"/></svg>`;
+  const memName = e => e.data.mode==="food" ? (e.data.dish?.name||"Dish") : (e.data.drink?.name||"Bottle");
+
+  async function drawHist(){
+    const h = loadHist();
+    histEmpty.hidden = h.length>0;
+    $("memCount").textContent = h.length ? `${h.length} saved` : "";
+    freeUrls();
+    const rows = await Promise.all(h.map(async e=>{
+      const [scan, selfie] = await Promise.all([ e.hasScan?getPhoto(e.id+":scan"):null, e.hasSelfie?getPhoto(e.id+":selfie"):null ]);
+      const isFood = e.data.mode==="food";
+      const main = scan ? `<img src="${blobUrl(scan)}" alt="">` : (selfie ? `<img src="${blobUrl(selfie)}" alt="">` : (isFood?ICON_PLATE:ICON_BOTTLE));
+      const dot = scan && selfie ? `<img class="selfie-dot" src="${blobUrl(selfie)}" alt="">` : "";
+      const occ = e.occasion && e.occasion!=="Anything" ? ` · ${esc(e.occasion)}` : "";
+      return `<li><button data-id="${e.id}" ${e.id===currentMem?'aria-current="true"':""}>
+        <span class="thumb">${main}${dot}</span>
+        <span class="mem-meta"><span class="hn">${esc(memName(e))}</span><span class="hd">${isFood?"Dish":"Bottle"} · ${esc(e.date)}${occ}</span></span>
+      </button></li>`;
+    }));
+    hist.innerHTML = rows.join("");
+    if(currentMem) drawMemBar(currentMem);
+  }
+  hist.addEventListener("click", e=>{
+    const b = e.target.closest("button[data-id]"); if(!b) return;
+    const entry = loadHist().find(x=>x.id===b.dataset.id);
+    if(entry){ render(entry.data, {memId: entry.id}); result.scrollIntoView({behavior:"smooth",block:"start"}); }
+  });
+
+  let deleteArmed = false;
+  async function drawMemBar(id){
+    const e = loadHist().find(x=>x.id===id);
+    if(!e){ memBar.hidden = true; currentMem = null; return; }
+    const [scan, selfie] = await Promise.all([ e.hasScan?getPhoto(id+":scan"):null, e.hasSelfie?getPhoto(id+":selfie"):null ]);
+    if(currentMem!==id) return;
+    const isFood = e.data.mode==="food";
+    memBar.hidden = false;
+    deleteArmed = false;
+    memBar.innerHTML = `
+      <h3>Memory · ${esc(e.date)}${e.occasion && e.occasion!=="Anything" ? " · "+esc(e.occasion) : ""}</h3>
+      <div class="photos">
+        <div class="ph">
+          <span class="cap">${isFood?"The food":"The bottle"}</span>
+          <div class="frame ${scan?"has":""}">${scan?`<img src="${blobUrl(scan)}" alt="Photo of ${esc(memName(e))}">`:`${isFood?ICON_PLATE:ICON_BOTTLE}<span>No photo (typed name)</span>`}</div>
+        </div>
+        <div class="ph">
+          <span class="cap">Selfie</span>
+          <div class="frame ${selfie?"has":""}">
+            ${selfie?`<img src="${blobUrl(selfie)}" alt="Your selfie">`:`${ICON_FACE}<span>Add a selfie</span><span>(optional)</span>`}
+            <input type="file" id="selfieIn" accept="image/*" capture="user" aria-label="${selfie?"Replace selfie":"Take a selfie for this memory"}">
+          </div>
+          ${selfie?`<button class="linkbtn" id="selfieDel">Remove selfie</button>`:""}
+        </div>
+      </div>
+      <div class="mem-actions">
+        <span class="fineprint">One selfie per memory. Saved on this phone only.</span>
+        <button class="btn small danger" id="memDel">Delete memory</button>
+      </div>`;
+    $("selfieIn").addEventListener("change", async ev=>{
+      const f = ev.target.files && ev.target.files[0]; if(!f) return;
+      const blob = await shrink(f, 900);
+      const ok = await putPhoto(id+":selfie", blob);
+      if(!ok){ setStatus("Couldn't save the selfie. Your browser may be blocking storage for this page.", {err:true}); return; }
+      const h = loadHist(); const x = h.find(y=>y.id===id); if(x){ x.hasSelfie = true; saveHist(h); }
+      drawHist();
+    });
+    const sd = $("selfieDel");
+    if(sd) sd.addEventListener("click", async ()=>{
+      await delPhoto(id+":selfie");
+      const h = loadHist(); const x = h.find(y=>y.id===id); if(x){ x.hasSelfie = false; saveHist(h); }
+      drawHist();
+    });
+    const del = $("memDel");
+    del.addEventListener("click", async ()=>{
+      if(!deleteArmed){ deleteArmed = true; del.classList.add("armed"); del.textContent = "Tap again to delete"; return; }
+      await Promise.all([delPhoto(id+":scan"), delPhoto(id+":selfie")]);
+      saveHist(loadHist().filter(y=>y.id!==id));
+      currentMem = null; memBar.hidden = true; memBar.innerHTML = "";
+      render(EXAMPLES[mode], {example:true});
+      drawHist();
+    });
+  }
+
+  function render(data, opts={}){
+    (data.mode==="food" ? renderFood : renderBottle)(data, !!opts.example);
+    currentMem = opts.memId || null;
+    if(currentMem){ drawMemBar(currentMem); }
+    else { memBar.hidden = true; memBar.innerHTML = ""; }
+    hist.querySelectorAll("button[data-id]").forEach(b=>{ if(b.dataset.id===currentMem) b.setAttribute("aria-current","true"); else b.removeAttribute("aria-current"); });
+  }
+
+  async function saveMemory(data, photoFile){
+    const id = newId();
+    const occBtn = document.querySelector('#occ .chip[aria-pressed="true"]');
+    const entry = {id, date:new Date().toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}), occasion: occBtn ? occBtn.textContent.trim() : "", data, hasScan:false, hasSelfie:false};
+    if(photoFile){
+      const blob = await shrink(photoFile, 1024);
+      entry.hasScan = !!(await putPhoto(id+":scan", blob));
+    }
+    const h = loadHist(); h.unshift(entry);
+    // Drop photos of memories that fall off the end
+    const keep = h.slice(0,60), dropped = h.slice(60);
+    dropped.forEach(d=>{ delPhoto(d.id+":scan"); delPhoto(d.id+":selfie"); });
+    saveHist(keep);
+    return id;
+  }
+
+  // Mode switch
+  const MODE_COPY = {
+    bottle:{tag:"Snap a drink. Find what to eat.", big:"Take a photo of the label", typed:"Or type the name", ph:"e.g. Pošip, Guinness, Chianti Classico", btn:"Find food pairings", need:"Add a photo or type the bottle name first."},
+    food:{tag:"Snap your food. Find what to drink.", big:"Take a photo of your food", typed:"Or type the dish", ph:"e.g. black risotto, burger, sushi, grilled fish", btn:"Find drinks", need:"Add a photo or type the dish first."}
+  };
+  function clearPhoto(){
+    file=null; photo.value=""; preview.hidden=true; preview.removeAttribute("src"); dropEmpty.style.display="contents";
+  }
+  function setMode(m){
+    if(m===mode) return;
+    mode=m;
+    document.querySelectorAll("#mode button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.m===m?"true":"false"));
+    const c = MODE_COPY[m];
+    $("tagline").textContent=c.tag; $("dropBig").textContent=c.big; $("typedLbl").textContent=c.typed;
+    typed.placeholder=c.ph; typed.value=""; go.textContent=c.btn;
+    clearPhoto(); setStatus("");
+    render(EXAMPLES[m], {example:true});
+  }
+  $("mode").addEventListener("click", e=>{ const b=e.target.closest("button[data-m]"); if(b) setMode(b.dataset.m); });
+
+  // Inputs
+  photo.addEventListener("change", ()=>{
+    file = photo.files && photo.files[0] || null;
+    if(file){
+      preview.src = URL.createObjectURL(file);
+      preview.hidden = false; dropEmpty.style.display="none";
+    }
+  });
+  $("occ").addEventListener("click", e=>{
+    const c = e.target.closest(".chip"); if(!c) return;
+    document.querySelectorAll("#occ .chip").forEach(x=>x.setAttribute("aria-pressed", x===c?"true":"false"));
+    occasion = c.dataset.v;
+  });
+
+  function setStatus(msg, {busy=false, err=false}={}){
+    status.className = "status"+(err?" err":"");
+    status.innerHTML = (busy?'<span class="dot" aria-hidden="true"></span>':"")+esc(msg);
+  }
+  const COPY = {
+    rate_limited:"You've reached today's scan limit. Come back tomorrow for more pairings.",
+    image_rejected:"That photo couldn't be read. Try another photo, or type the name.",
+    invalid_json:"The answer came back garbled. Tap the button to try again.",
+    busy:"The pairing service is busy right now. Try again in a minute.",
+    upstream_error:"The pairing service had a problem. Try again in a moment.",
+    not_configured:"The app isn't set up yet (missing API key on the server).",
+    forbidden:"This app can't be used from here.",
+    offline:"You seem to be offline. Check your connection and try again.",
+  };
+
+  // Photo → small JPEG → base64 (keeps uploads fast and cheap)
+  function toBase64(blob){
+    return new Promise((res, rej)=>{
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(",")[1] || "");
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+
+  async function askPairing({mode, name, file, signal}){
+    const c = currentCountry();
+    const payload = { mode, name, occasion, country: {name:c.name, cur:c.cur, ex:c.ex} };
+    if(file){
+      const small = await shrink(file, 1024, 0.8);
+      payload.image = await toBase64(small);
+      payload.imageType = small.type && small.type.startsWith("image/") ? small.type : "image/jpeg";
+    }
+    let r;
+    try{
+      r = await fetch("/api/pair", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload), signal });
+    }catch(e){
+      if(e && e.name==="AbortError") throw {code:"cancelled"};
+      throw {code: navigator.onLine===false ? "offline" : "upstream_error"};
+    }
+    let data = null;
+    try{ data = await r.json(); }catch{}
+    if(!r.ok) throw {code: (data && data.error) || "upstream_error"};
+    if(!data || typeof data!=="object") throw {code:"invalid_json"};
+    return data;
+  }
+
+  go.addEventListener("click", async ()=>{
+    const name = typed.value.trim();
+    if(!file && !name){ setStatus(MODE_COPY[mode].need, {err:true}); return; }
+    const m = mode;
+    ctl = new AbortController();
+    go.disabled = true; stop.hidden = false;
+    setStatus(m==="food" ? (file?"Looking at your food and choosing drinks…":"Choosing drinks…") : (file?"Reading the label and choosing pairings…":"Choosing pairings…"), {busy:true});
+    try{
+      const data = await askPairing({mode:m, name, file, signal:ctl.signal});
+      data.mode = m;
+      setStatus("");
+      const ok = m==="food" ? (!data.not_food && data.dish) : (!data.not_a_drink && data.drink);
+      if(ok){
+        const id = await saveMemory(data, file);
+        render(data, {memId:id});
+        drawHist();
+      } else {
+        render(data);
+      }
+      result.scrollIntoView({behavior:"smooth",block:"start"});
+    }catch(e){
+      if(e && e.code==="cancelled"){ setStatus("Stopped."); }
+      else setStatus(COPY[e && e.code] || "Something went wrong. Try again in a moment.", {err:true});
+    }finally{
+      go.disabled = false; stop.hidden = true; ctl = null;
+    }
+  });
+  stop.addEventListener("click", ()=> ctl && ctl.abort());
+
+  // ---- Age gate (remembered on this device) ----
+  const AGE_21 = new Set(["US"]);
+  const AGE_KEY = "bb.ageOk";
+  function initAgeGate(){
+    let ok = false; try{ ok = localStorage.getItem(AGE_KEY)==="1"; }catch{}
+    const gate = $("ageGate");
+    if(ok){ gate.hidden = true; return; }
+    const age = AGE_21.has(countryCode) ? 21 : 18;
+    $("ageNum").textContent = age;
+    $("ageNum2").textContent = age;
+    gate.hidden = false;
+    document.body.classList.add("locked");
+    $("ageYes").focus();
+    $("ageYes").addEventListener("click", ()=>{
+      try{ localStorage.setItem(AGE_KEY,"1"); }catch{}
+      gate.hidden = true; document.body.classList.remove("locked");
+    });
+    $("ageNo").addEventListener("click", ()=>{
+      $("ageAsk").hidden = true; $("ageSorry").hidden = false;
+    });
+  }
+
+  // Start
+  initCountryPicker();
+  initAgeGate();
+  go.textContent = MODE_COPY.bottle.btn;
+  render(EXAMPLES.bottle, {example:true});
+  drawHist();
+})();
+</script>
+</body>
+</html>

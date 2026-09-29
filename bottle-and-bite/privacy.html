@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy · Bottle &amp; Bite</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Figtree:wght@400;600&display=swap">
+<style>
+:root{--bg:#F2F3EF;--fg:#1C221F;--muted:#5E6862;--line:#D9DDD5;--claret:#7A1F35}
+@media (prefers-color-scheme: dark){:root{--bg:#111513;--fg:#E8ECE7;--muted:#9AA59F;--line:#2C3531;--claret:#E08A9E;color-scheme:dark}}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"Figtree",system-ui,sans-serif;line-height:1.6}
+main{max-width:640px;margin:0 auto;padding:32px 16px 56px}
+h1{font-family:"Gloock",Georgia,serif;font-weight:400;font-size:2rem;margin:0 0 4px}
+h2{font-size:1.05rem;margin:28px 0 6px}
+p,li{color:var(--fg)}
+.muted{color:var(--muted)}
+a{color:var(--claret)}
+.todo{background:#fff3c4;color:#5a4500;padding:0 4px;border-radius:4px}
+</style>
+</head>
+<body>
+<main>
+  <p><a href="/">← Back to Bottle &amp; Bite</a></p>
+  <h1>Privacy</h1>
+  <p class="muted">Last updated: <span class="todo">[date you publish]</span></p>
+
+  <h2>Who runs this app</h2>
+  <p>Bottle &amp; Bite is run by <span class="todo">[your full name or company]</span>, <span class="todo">[country]</span>. Contact: <span class="todo">[your email]</span>.</p>
+
+  <h2>What happens when you scan</h2>
+  <p>When you tap "Find pairings" or "Find drinks", the app sends the photo you picked (shrunk to a small JPEG) or the name you typed, the occasion you chose and the country you shop in to our server. Our server passes it to Anthropic's Claude AI to get the pairing suggestions and sends the answer back to you.</p>
+  <ul>
+    <li>We do not store your photos on our server. They are only used to answer that one request.</li>
+    <li>Anthropic processes the request as our service provider. Under its commercial terms it does not use API data to train its models by default and keeps it only for a limited time for safety and abuse monitoring. See <a href="https://www.anthropic.com/legal/privacy" rel="noopener">Anthropic's privacy policy</a>.</li>
+    <li>The app is hosted by Vercel, which keeps short-lived technical logs (such as IP addresses) to run and protect the service.</li>
+    <li>To prevent abuse, we count scans per IP address for one day and then discard the count.</li>
+  </ul>
+
+  <h2>What stays on your phone</h2>
+  <p>Your memories (scan results, the photos you scanned and any selfies you add), your country choice and your age confirmation are saved only in your browser on your device. They are never uploaded. Selfies are never sent to the AI or to our server. Clearing your browser's site data, or tapping "Delete memory", removes them.</p>
+
+  <h2>Age</h2>
+  <p>Bottle &amp; Bite is only for adults of legal drinking age in their country.</p>
+
+  <h2>Your rights</h2>
+  <p>If you're in the EU/EEA or UK, you have the right to ask what personal data we hold about you, and to have it corrected or deleted. Since we don't keep your photos or an account, there is usually nothing stored about you on our side. Email us at <span class="todo">[your email]</span> with any question. You can also complain to your local data protection authority.</p>
+
+  <p class="muted">Suggestions and prices are AI estimates and may be wrong. Please drink responsibly.</p>
+</main>
+</body>
+</html>

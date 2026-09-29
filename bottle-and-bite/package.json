@@ -1,0 +1,7 @@
+{
+  "name": "bottle-and-bite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Snap a wine or beer label to find food that goes with it, or snap your food to find the right drink.",
+  "engines": { "node": ">=18" }
+}
