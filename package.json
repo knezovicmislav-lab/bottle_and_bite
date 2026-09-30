@@ -1,0 +1,14 @@
+{
+  "name": "bottle-and-bite-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android test app for Bottle & Bite (Capacitor wrapper around the live web app)",
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.2"
+  }
+}

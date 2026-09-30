@@ -1,0 +1,12 @@
+{
+  "appId": "com.bottleandbite.app",
+  "appName": "Bottle & Bite",
+  "webDir": "www",
+  "server": {
+    "url": "https://bottle-and-bite.vercel.app",
+    "cleartext": false
+  },
+  "android": {
+    "backgroundColor": "#F2F3EF"
+  }
+}
