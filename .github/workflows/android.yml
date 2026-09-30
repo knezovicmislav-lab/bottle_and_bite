@@ -8,6 +8,9 @@ on:
       - "**/android-app/**"
       - ".github/workflows/android.yml"
 
+permissions:
+  contents: write           # lets the build publish the app file as a download
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -30,7 +33,7 @@ jobs:
         with:
           node-version: 22
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -77,3 +80,16 @@ jobs:
           name: bottle-and-bite-android-test
           path: bottle-and-bite-test.apk
           retention-days: 30
+
+      - name: Publish a public download link
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-test
+          name: Bottle & Bite – Android test app
+          body: |
+            Latest test build of the Bottle & Bite Android app.
+            On your Android phone, tap **bottle-and-bite-test.apk** below to download and install it.
+          files: bottle-and-bite-test.apk
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
