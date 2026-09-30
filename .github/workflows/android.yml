@@ -4,17 +4,27 @@ on:
   workflow_dispatch:          # lets you start a build with the "Run workflow" button
   push:
     paths:
-      - "android-app/**"
+      - "**/capacitor.config.json"
+      - "**/android-app/**"
       - ".github/workflows/android.yml"
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: android-app
     steps:
       - uses: actions/checkout@v4
+
+      - name: Find the app folder
+        run: |
+          CFG=$(find . -name capacitor.config.json -not -path "*/node_modules/*" -not -path "*/android/*" | head -n 1)
+          if [ -z "$CFG" ]; then
+            echo "::error::Couldn't find capacitor.config.json anywhere in the repository. Upload the android-app folder first."
+            exit 1
+          fi
+          APP_DIR=$(cd "$(dirname "$CFG")" && pwd)
+          echo "Found the app in: $APP_DIR"
+          ls -la "$APP_DIR"
+          echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v4
         with:
@@ -26,28 +36,41 @@ jobs:
           java-version: 21
 
       - name: Install Capacitor
-        run: npm install --no-audit --no-fund
+        run: cd "$APP_DIR" && npm install --no-audit --no-fund
 
       - name: Create the Android project
-        run: npx cap add android
+        run: |
+          cd "$APP_DIR"
+          mkdir -p www
+          [ -f www/index.html ] || echo '<!doctype html><title>Bottle &amp; Bite</title><p>Check your internet connection and reopen the app.</p>' > www/index.html
+          rm -rf android
+          npx cap add android
 
       - name: App icon and splash screen
-        run: npx capacitor-assets generate --android --iconBackgroundColor '#7A1F35' --splashBackgroundColor '#F2F3EF'
+        run: |
+          cd "$APP_DIR"
+          if [ -d assets ]; then
+            npx capacitor-assets generate --android --iconBackgroundColor '#7A1F35' --splashBackgroundColor '#F2F3EF'
+          else
+            echo "No assets folder found; using the default icon."
+          fi
 
       - name: Allow the camera (for label, food and selfie photos)
         run: |
+          cd "$APP_DIR"
           sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />#' android/app/src/main/AndroidManifest.xml
           grep -n "permission" android/app/src/main/AndroidManifest.xml
 
       - name: Build the test app (APK)
         run: |
+          cd "$APP_DIR"
           npx cap sync android
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
       - name: Rename the file
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk ../bottle-and-bite-test.apk
+        run: cp "$APP_DIR/android/app/build/outputs/apk/debug/app-debug.apk" "$GITHUB_WORKSPACE/bottle-and-bite-test.apk"
 
       - uses: actions/upload-artifact@v4
         with:
